@@ -27,7 +27,6 @@ jobs:
 
   build:
     name: Build docker image
-    needs: [ ci ]
 
     timeout-minutes: 60
 
