@@ -54,7 +54,7 @@ class Provider::Finnhub < Provider
         Sentry.capture_exception(InvalidExchangeRateError.new("#{self.class.name} could not find exchange rate"), level: :warning) do |scope|
           scope.set_context("rate", { from: from, to: to, date: date })
         end
-       
+
         return Rate.new(date: date.to_date, from:, to:, rate: nil)
       end
 
@@ -67,7 +67,7 @@ class Provider::Finnhub < Provider
       # Finnhub's free tier doesn't provide historical forex data
       # We'll fetch the current rate and replicate it for all dates as a workaround
       # For production use, consider using a dedicated forex API or upgrading
-      
+
       response = client.get("#{base_url}/api/v1/forex/rates?base=#{from}&token=#{api_key}")
       rates_data = JSON.parse(response.body)
 
