@@ -41,52 +41,49 @@ class Provider::Finnhub < Provider
 
   def fetch_exchange_rate(from:, to:, date:)
     with_provider_response do
-      # Finnhub doesn't have historical forex rates in their free tier
-      # We'll use the current rate as fallback for historical dates
-      # For better accuracy, consider using a dedicated forex API or upgrading Finnhub plan
-      response = client.get("#{base_url}/api/v1/forex/rates?base=#{from}&token=#{api_key}")
-      rates = JSON.parse(response.body)
-
-      rate_value = rates.dig("quote", to)
-
-      if rate_value.nil?
-        Rails.logger.warn("#{self.class.name} could not find rate for #{from}/#{to}")
-        Sentry.capture_exception(InvalidExchangeRateError.new("#{self.class.name} could not find exchange rate"), level: :warning) do |scope|
-          scope.set_context("rate", { from: from, to: to, date: date })
+      # Finnhub free tier uses /quote with CURR1_CURR2 symbol format
+      # Note: Returns current rate only; historical dates not supported on free tier
+      symbol = "#{from}_#{to}"
+      
+      response = client.get("#{base_url}/api/v1/quote?symbol=#{symbol}&token=#{api_key}")
+      data = JSON.parse(response.body)
+      
+      rate_value = data["c"] # "c" is current price
+      
+      # If direct pair doesn't exist or returns 0, try inverse and calculate
+      if rate_value.nil? || rate_value == 0
+        inverse_symbol = "#{to}_#{from}"
+        response = client.get("#{base_url}/api/v1/quote?symbol=#{inverse_symbol}&token=#{api_key}")
+        data = JSON.parse(response.body)
+        inverse_rate = data["c"]
+        
+        if inverse_rate && inverse_rate != 0
+          rate_value = 1.0 / inverse_rate
+        else
+          Rails.logger.warn("#{self.class.name} could not find rate for #{from}/#{to} or #{to}/#{from}")
+          return Rate.new(date: date.to_date, from:, to:, rate: nil)
         end
-
-        return Rate.new(date: date.to_date, from:, to:, rate: nil)
       end
-
+      
       Rate.new(date: date.to_date, from:, to:, rate: rate_value)
     end
   end
 
   def fetch_exchange_rates(from:, to:, start_date:, end_date:)
     with_provider_response do
-      # Finnhub's free tier doesn't provide historical forex data
-      # We'll fetch the current rate and replicate it for all dates as a workaround
-      # For production use, consider using a dedicated forex API or upgrading
-
-      response = client.get("#{base_url}/api/v1/forex/rates?base=#{from}&token=#{api_key}")
-      rates_data = JSON.parse(response.body)
-
-      rate_value = rates_data.dig("quote", to)
-
-      if rate_value.nil?
-        Rails.logger.warn("#{self.class.name} could not find rate for #{from}/#{to}")
-        return []
-      end
-
-      # Generate rates for each date in the range using the current rate
-      # This is a limitation of Finnhub's free tier
+      # Fetch current rate using the corrected implementation
+      current_rate = fetch_exchange_rate(from: from, to: to, date: Date.current)
+      
+      return [] if current_rate.rate.nil?
+      
+      # Replicate for all dates (free tier limitation - no historical data)
       results = []
       current_date = start_date
       while current_date <= end_date
-        results << Rate.new(date: current_date.to_date, from:, to:, rate: rate_value)
+        results << Rate.new(date: current_date.to_date, from: from, to: to, rate: current_rate.rate)
         current_date += 1.day
       end
-
+      
       results
     end
   end
