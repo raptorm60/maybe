@@ -110,7 +110,7 @@ class Provider::Finnhub < Provider
         Security.new(
           symbol: security.dig("symbol"),
           name: security.dig("description"),
-          logo_url: "https://finnhub.io/api/logo?symbol=#{security.dig('symbol')}",
+          logo_url: nil, # Logo will be fetched via fetch_security_info
           exchange_operating_mic: nil, # Finnhub doesn't provide MIC codes in search
           country_code: nil # Will need to fetch this separately if needed
         )
