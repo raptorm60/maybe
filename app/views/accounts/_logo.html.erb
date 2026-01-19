@@ -8,7 +8,7 @@
 } %>
 
 <% if account.plaid_account_id? && account.institution_domain.present? %>
-  <%= image_tag "https://logo.synthfinance.com/#{account.institution_domain}", class: "shrink-0 rounded-full #{size_classes[size]}" %>
+  <%= render DS::FilledIcon.new(variant: :text, text: account.name, size: size, rounded: true) %>
 <% elsif account.logo.attached? %>
   <%= image_tag account.logo, class: "shrink-0 rounded-full #{size_classes[size]}" %>
 <% else %>

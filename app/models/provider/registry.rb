@@ -67,6 +67,9 @@ class Provider::Registry
 
         Provider::Openai.new(access_token)
       end
+      def frankfurter
+        Provider::Frankfurter.new
+      end
   end
 
   def initialize(concept)
@@ -89,16 +92,16 @@ class Provider::Registry
   private
     attr_reader :concept
 
-    def available_providers
-      case concept
-      when :exchange_rates
-        %i[finnhub]
-      when :securities
-        %i[finnhub]
-      when :llm
-        %i[openai]
-      else
-        %i[finnhub plaid_us plaid_eu github openai]
+      def available_providers
+        case concept
+        when :exchange_rates
+          %i[frankfurter]
+        when :securities
+          %i[finnhub]
+        when :llm
+          %i[openai]
+        else
+          %i[finnhub frankfurter plaid_us plaid_eu github openai]
+        end
       end
-    end
 end

@@ -18,12 +18,10 @@ class Security < ApplicationRecord
   end
 
   def to_combobox_option
-    SynthComboboxOption.new(
-      symbol: ticker,
-      name: name,
-      logo_url: logo_url,
-      exchange_operating_mic: exchange_operating_mic,
-      country_code: country_code
+    # TODO: Implement replacement for SynthComboboxOption or use generic
+    OpenStruct.new(
+      id:ticker, 
+      display: "#{ticker} - #{name} (#{exchange_operating_mic})"
     )
   end
 
