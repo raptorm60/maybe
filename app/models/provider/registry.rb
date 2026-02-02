@@ -67,6 +67,15 @@ class Provider::Registry
 
         Provider::Openai.new(access_token)
       end
+
+      def xai
+        access_token = ENV.fetch("XAI_API_KEY", Setting.xai_api_key)
+
+        return nil unless access_token.present?
+
+        Provider::Xai.new(access_token)
+      end
+
       def frankfurter
         Provider::Frankfurter.new
       end
