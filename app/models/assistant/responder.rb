@@ -54,17 +54,18 @@ class Assistant::Responder
       # Get follow-up response with tool call results
       get_llm_response(
         streamer: streamer,
+        functions: [], # Disable tools to prevent recursive loops
         function_results: function_tool_calls.map(&:to_result),
         previous_response_id: response.id
       )
     end
 
-    def get_llm_response(streamer:, function_results: [], previous_response_id: nil)
+    def get_llm_response(streamer:, functions: nil, function_results: [], previous_response_id: nil)
       response = llm.chat_response(
         message.content,
         model: message.ai_model,
         instructions: instructions,
-        functions: function_tool_caller.function_definitions,
+        functions: functions || function_tool_caller.function_definitions,
         function_results: function_results,
         streamer: streamer,
         previous_response_id: previous_response_id
