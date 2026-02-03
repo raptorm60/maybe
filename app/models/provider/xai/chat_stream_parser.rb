@@ -14,14 +14,14 @@ class Provider::Xai::ChatStreamParser
     return unless delta
 
     content = delta["content"]
+    tool_calls = delta["tool_calls"]
     
     if content.present?
       Chunk.new(type: "output_text", data: content)
+    elsif tool_calls.present?
+      # Pass the raw tool_calls array from the delta
+      Chunk.new(type: "tool_call_chunk", data: tool_calls)
     elsif choice["finish_reason"].present?
-      # Capture the full response object when finished if needed
-      # But for streaming, we mainly care about content chunks
-      # The main ChatParser handles the full response object if we reconstruct it
-      # For now, just return nil or handle completion if needed by the consumer
       nil 
     end
   end

@@ -89,11 +89,43 @@ class Provider::Xai < Provider
 
         # If streaming, manually construct the response from collected chunks
         if stream_proxy.present?
-          full_content = collected_chunks
-            .select { |chunk| chunk.type == "output_text" }
-            .map(&:data)
-            .join
-          
+          full_content = ""
+          tool_calls_buffer = {}
+
+          collected_chunks.each do |chunk|
+            if chunk.type == "output_text"
+              full_content << (chunk.data || "")
+            elsif chunk.type == "tool_call_chunk"
+              chunk.data.each do |tool_call_delta|
+                index = tool_call_delta["index"]
+                buffer = tool_calls_buffer[index] ||= { id: nil, name: "", arguments: "" }
+                
+                buffer[:id] = tool_call_delta["id"] if tool_call_delta["id"]
+                
+                if fn = tool_call_delta["function"]
+                  buffer[:name] << fn["name"] if fn["name"]
+                  buffer[:arguments] << fn["arguments"] if fn["arguments"]
+                end
+              end
+            end
+          end
+
+          # checking if tool calls are present
+          function_requests = tool_calls_buffer.values.map do |tc|
+            # Ensure we have an ID (sometimes ID is only in the first chunk)
+            # If strictly needed and missing, might need more robust handling, but usually first chunk has it.
+            
+            Provider::LlmConcept::ChatFunctionRequest.new(
+              id: tc[:id],
+              call_id: tc[:id],
+              function_name: tc[:name],
+              function_args: JSON.parse(tc[:arguments])
+            )
+          rescue JSON::ParserError => e
+            Rails.logger.error "Failed to parse function arguments: #{tc[:arguments]} - #{e.message}"
+            nil
+          end.compact
+
           # Return constructed ChatResponse
           Provider::LlmConcept::ChatResponse.new(
             id: "stream-#{SecureRandom.uuid}",
@@ -104,7 +136,7 @@ class Provider::Xai < Provider
                 output_text: full_content
               )
             ],
-            function_requests: []
+            function_requests: function_requests
           )
         else
           ChatParser.new(raw_response).parsed
