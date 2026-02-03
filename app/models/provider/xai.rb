@@ -4,8 +4,14 @@ class Provider::Xai < Provider
   # Subclass so errors caught in this provider are raised as Provider::Xai::Error
   Error = Class.new(Provider::Error)
 
-  # xAI Grok model
-  MODELS = %w[grok-4-1-fast-reasoning]
+  # xAI Grok models - support both native names and OpenAI-compatible aliases
+  MODELS = %w[grok-2-1212 gpt-4.1 gpt-4.1-mini]
+  
+  # Map OpenAI model names to xAI Grok models
+  MODEL_MAPPING = {
+    "gpt-4.1" => "grok-2-1212",
+    "gpt-4.1-mini" => "grok-2-1212"
+  }.freeze
 
   def initialize(access_token)
     @client = ::OpenAI::Client.new(
@@ -16,6 +22,11 @@ class Provider::Xai < Provider
 
   def supports_model?(model)
     MODELS.include?(model)
+  end
+  
+  # Translate OpenAI model names to xAI equivalents
+  def translate_model(model)
+    MODEL_MAPPING[model] || model
   end
 
   def auto_categorize(transactions: [], user_categories: [])
@@ -66,7 +77,7 @@ class Provider::Xai < Provider
       end
 
       raw_response = client.responses.create(parameters: {
-        model: model,
+        model: translate_model(model),  # Translate gpt-4.1 -> grok-2-1212
         input: chat_config.build_input(prompt),
         instructions: instructions,
         tools: chat_config.tools,
