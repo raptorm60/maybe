@@ -127,7 +127,7 @@ class Provider::Xai < Provider
           end.compact
 
           # Return constructed ChatResponse
-          Provider::LlmConcept::ChatResponse.new(
+          final_response = Provider::LlmConcept::ChatResponse.new(
             id: "stream-#{SecureRandom.uuid}",
             model: model,
             messages: [
@@ -138,6 +138,17 @@ class Provider::Xai < Provider
             ],
             function_requests: function_requests
           )
+
+          # CRITICAL: Emit the final response to the streamer so the Responder knows the stream is done
+          # and can trigger tool execution or final update.
+          streamer.call(
+            Provider::LlmConcept::ChatStreamChunk.new(
+              type: "response",
+              data: final_response
+            )
+          )
+
+          final_response
         else
           ChatParser.new(raw_response).parsed
         end
