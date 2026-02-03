@@ -65,6 +65,7 @@ class Provider::Xai < Provider
         nil
       end
 
+      begin
         # Use blocking request (stream: false) to avoid chunk parsing issues
         # We then simulate streaming to the application to satisfy the architecture
         params = {
