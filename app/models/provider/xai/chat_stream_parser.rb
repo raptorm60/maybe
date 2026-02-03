@@ -16,6 +16,9 @@ class Provider::Xai::ChatStreamParser
     content = delta["content"]
     tool_calls = delta["tool_calls"]
     
+    # Debug log for streaming chunks
+    Rails.logger.info "[ChatStreamParser] Chunk: content=#{content.present?}, tools=#{tool_calls.present?}, finish=#{choice["finish_reason"]}, delta=#{delta.keys}"
+
     if content.present?
       Chunk.new(type: "output_text", data: content)
     elsif tool_calls.present?
