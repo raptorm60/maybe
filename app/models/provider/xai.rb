@@ -83,7 +83,8 @@ class Provider::Xai < Provider
           params[:messages].unshift({ role: "system", content: instructions })
         end
 
-        Rails.logger.info "xAI Request Params: #{params.except(:messages, :stream).inspect}"
+        # Capture the payload for debugging
+        Rails.logger.info "[Provider::Xai] Request Payload: #{params.except(:stream).to_json}"
 
         raw_response = client.chat(parameters: params)
 

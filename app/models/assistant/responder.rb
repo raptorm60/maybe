@@ -1,5 +1,6 @@
 class Assistant::Responder
   def initialize(message:, instructions:, function_tool_caller:, llm:)
+    Rails.logger.info "[Assistant::Responder] Initialized for message: #{message.id}"
     @message = message
     @instructions = instructions
     @function_tool_caller = function_tool_caller
@@ -34,7 +35,9 @@ class Assistant::Responder
     attr_reader :message, :instructions, :function_tool_caller, :llm
 
     def handle_follow_up_response(response)
+      Rails.logger.info "[Assistant::Responder] Handling follow-up response for ID: #{response.id}"
       streamer = proc do |chunk|
+        Rails.logger.info "[Assistant::Responder] Follow-up chunk received: type=#{chunk.type}"
         case chunk.type
         when "output_text"
           emit(:output_text, chunk.data)
@@ -44,13 +47,16 @@ class Assistant::Responder
         end
       end
 
+      Rails.logger.info "[Assistant::Responder] Executing tool requests..."
       function_tool_calls = function_tool_caller.fulfill_requests(response.function_requests)
+      Rails.logger.info "[Assistant::Responder] Tool requests executed. Count: #{function_tool_calls.count}"
 
       emit(:response, {
         id: response.id,
         function_tool_calls: function_tool_calls
       })
 
+      Rails.logger.info "[Assistant::Responder] Requesting follow-up LLM response..."
       # Get follow-up response with tool call results
       get_llm_response(
         streamer: streamer,
@@ -58,6 +64,7 @@ class Assistant::Responder
         function_results: function_tool_calls.map(&:to_result),
         previous_response_id: response.id
       )
+      Rails.logger.info "[Assistant::Responder] Follow-up LLM response complete."
     end
 
     def get_llm_response(streamer:, functions: nil, function_results: [], previous_response_id: nil)
