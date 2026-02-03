@@ -29,7 +29,7 @@ class Provider::Xai::ChatConfig
           type: "function",
           function: {
             name: res[:function_name],
-            arguments: res[:function_arguments]
+            arguments: res[:function_arguments].to_json
           }
         }
       end
