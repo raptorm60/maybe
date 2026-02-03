@@ -1,58 +1,56 @@
 class Provider::Xai::ChatParser
-  Error = Class.new(StandardError)
-
   def initialize(object)
     @object = object
   end
 
   def parsed
+    # Handle standard OpenAI response
     ChatResponse.new(
-      id: response_id,
-      model: response_model,
-      messages: messages,
-      function_requests: function_requests
+      id: object["id"],
+      model: object["model"],
+      messages: parse_messages,
+      function_requests: parse_function_requests
     )
   end
 
   private
     attr_reader :object
 
+    # Use classes from LlmConcept
     ChatResponse = Provider::LlmConcept::ChatResponse
     ChatMessage = Provider::LlmConcept::ChatMessage
     ChatFunctionRequest = Provider::LlmConcept::ChatFunctionRequest
 
-    def response_id
-      object.dig("id")
-    end
+    def parse_messages
+      # Extract content from choices
+      # OpenAI format: { choices: [ { message: { content: ".." } } ] }
+      choice = object.dig("choices", 0, "message")
+      return [] unless choice
 
-    def response_model
-      object.dig("model")
-    end
+      content = choice["content"]
+      return [] unless content.present?
 
-    def messages
-      message_items = object.dig("output").filter { |item| item.dig("type") == "message" }
-
-      message_items.map do |message_item|
+      [
         ChatMessage.new(
-          id: message_item.dig("id"),
-          output_text: message_item.dig("content").map do |content|
-            text = content.dig("text")
-            refusal = content.dig("refusal")
-            text || refusal
-          end.flatten.join("\n")
+          id: object["id"], # Use response ID as message ID since message object doesn't have one
+          output_text: content
         )
-      end
+      ]
     end
 
-    def function_requests
-      function_items = object.dig("output").filter { |item| item.dig("type") == "function_call" }
+    def parse_function_requests
+      choice = object.dig("choices", 0, "message")
+      return [] unless choice
 
-      function_items.map do |function_item|
+      # OpenAI format: { tool_calls: [ { function: { name: "..", arguments: ".." } } ] }
+      tool_calls = choice["tool_calls"] || []
+      
+      tool_calls.map do |tool_call|
         ChatFunctionRequest.new(
-          id: function_item.dig("id"),
-          call_id: function_item.dig("call_id"),
-          function_name: function_item.dig("name"),
-          function_args: function_item.dig("arguments")
+          id: tool_call["id"],
+          call_id: tool_call["id"],
+          function_name: tool_call.dig("function", "name"),
+          function_args: JSON.parse(tool_call.dig("function", "arguments"))
         )
       end
     end

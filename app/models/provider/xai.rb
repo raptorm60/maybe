@@ -66,20 +66,40 @@ class Provider::Xai < Provider
       end
 
       begin
-        raw_response = client.responses.create(parameters: {
+        # Use standard Chat Completions API
+        params = {
           model: model,
-          input: chat_config.build_input(prompt),
-          instructions: instructions,
+          messages: chat_config.build_input(prompt),
           tools: chat_config.tools,
-          previous_response_id: previous_response_id,
           stream: stream_proxy
-        })
+        }
 
-        # If streaming, Ruby OpenAI does not return anything, so to normalize this method's API, we search
-        # for the "response chunk" in the stream and return it (it is already parsed)
+        # Add system instructions if present
+        if instructions.present?
+          params[:messages].unshift({ role: "system", content: instructions })
+        end
+
+        raw_response = client.chat(parameters: params)
+
+        # If streaming, manually construct the response from collected chunks
         if stream_proxy.present?
-          response_chunk = collected_chunks.find { |chunk| chunk.type == "response" }
-          response_chunk.data
+          full_content = collected_chunks
+            .select { |chunk| chunk.type == "output_text" }
+            .map(&:data)
+            .join
+          
+          # Return constructed ChatResponse
+          Provider::LlmConcept::ChatResponse.new(
+            id: "stream-#{SecureRandom.uuid}",
+            model: model,
+            messages: [
+              Provider::LlmConcept::ChatMessage.new(
+                id: "msg-#{SecureRandom.uuid}",
+                output_text: full_content
+              )
+            ],
+            function_requests: []
+          )
         else
           ChatParser.new(raw_response).parsed
         end
