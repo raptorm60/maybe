@@ -70,14 +70,20 @@ class Provider::Xai < Provider
         params = {
           model: model,
           messages: chat_config.build_input(prompt),
-          tools: chat_config.tools,
           stream: stream_proxy
         }
+
+        # Only add tools if they exist (xAI might reject empty tools array)
+        if chat_config.tools.present?
+          params[:tools] = chat_config.tools
+        end
 
         # Add system instructions if present
         if instructions.present?
           params[:messages].unshift({ role: "system", content: instructions })
         end
+
+        Rails.logger.info "xAI Request Params: #{params.except(:messages, :stream).inspect}"
 
         raw_response = client.chat(parameters: params)
 
