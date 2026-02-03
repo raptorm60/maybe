@@ -4,6 +4,9 @@ class Provider::Xai::ChatParser
   end
 
   def parsed
+    # Debug log for standard response parsing
+    Rails.logger.info "[ChatParser] Raw Object: #{object.inspect}"
+
     # Handle standard OpenAI response
     ChatResponse.new(
       id: object["id"],
