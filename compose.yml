@@ -1,0 +1,89 @@
+services:
+  web:
+    image: ghcr.io/maybe-finance/maybe:latest
+    container_name: maybe-web
+    volumes:
+      - maybe-storage:/rails/storage
+    restart: unless-stopped
+    environment:
+      <<: *rails_env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - maybe_net
+
+  worker:
+    image: ghcr.io/maybe-finance/maybe:latest
+    container_name: maybe-worker
+    command: bundle exec sidekiq
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *rails_env
+    networks:
+      - maybe_net
+
+  db:
+    image: postgres:16
+    container_name: maybe-db
+    restart: unless-stopped
+    volumes:
+      - maybe-postgres:/var/lib/postgresql/data
+    environment:
+      <<: *db_env
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - maybe_net
+
+  redis:
+    image: redis:latest
+    container_name: maybe-redis
+    restart: unless-stopped
+    volumes:
+      - maybe-redis:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - maybe_net
+
+x-db-env: &db_env
+  POSTGRES_USER: ${POSTGRES_USER:-maybe_user}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-maybe_password}
+  POSTGRES_DB: ${POSTGRES_DB:-maybe_production}
+
+x-rails-env: &rails_env
+  <<: *db_env
+  SECRET_KEY_BASE: ${SECRET_KEY_BASE:-a7523c3d0ae56415046ad8abae168d71074a79534a7062258f8d1d51ac2f76d3c3bc86d86b6b0b307df30d9a6a90a2066a3fa9e67c5e6f374dbd7dd4e0778e13}
+  SELF_HOSTED: "true"
+  RAILS_FORCE_SSL: "true"  # Enforce HTTPS since we have SSL via Nginx
+  RAILS_ASSUME_SSL: "true" # Assume SSL for proper HTTPS handling
+  DB_HOST: maybe-db
+  DB_PORT: 5432
+  REDIS_URL: redis://maybe-redis:6379/1
+  # Finnhub API key for stock market data (free tier)
+  FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+  # OpenAI for AI features (optional - will incur costs if used)
+  OPENAI_ACCESS_TOKEN: ${OPENAI_ACCESS_TOKEN:-}
+  # xAI for AI features using Grok (optional - alternative to OpenAI)
+  XAI_API_KEY: ${XAI_API_KEY:-}
+
+volumes:
+  maybe-storage:
+  maybe-postgres:
+  maybe-redis:
+
+networks:
+  maybe_net:
+    driver: bridge

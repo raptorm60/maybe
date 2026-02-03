@@ -68,8 +68,6 @@ coverage
 # Ignore node related files
 node_modules
 
-compose.yml
-
 plaid_test_accounts/
 
 # Added by Claude Task Master
