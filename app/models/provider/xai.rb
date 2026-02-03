@@ -65,12 +65,12 @@ class Provider::Xai < Provider
         nil
       end
 
-      begin
-        # Use standard Chat Completions API
+        # Use blocking request (stream: false) to avoid chunk parsing issues
+        # We then simulate streaming to the application to satisfy the architecture
         params = {
           model: model,
           messages: chat_config.build_input(prompt),
-          stream: stream_proxy
+          stream: false 
         }
 
         # Only add tools if they exist (xAI might reject empty tools array)
@@ -83,76 +83,37 @@ class Provider::Xai < Provider
           params[:messages].unshift({ role: "system", content: instructions })
         end
 
-        # Capture the payload for debugging
-        Rails.logger.info "[Provider::Xai] Request Payload: #{params.except(:stream).to_json}"
+        Rails.logger.info "[Provider::Xai] Blocking Request Payload: #{params.to_json}"
 
         raw_response = client.chat(parameters: params)
+        
+        # Parse the full response using the reliable (non-streaming) ChatParser
+        # This bypassed ChatStreamParser issues completely
+        parsed_response = ChatParser.new(raw_response).parsed
 
-        # If streaming, manually construct the response from collected chunks
-        if stream_proxy.present?
-          full_content = ""
-          tool_calls_buffer = {}
-
-          collected_chunks.each do |chunk|
-            if chunk.type == "output_text"
-              full_content << (chunk.data || "")
-            elsif chunk.type == "tool_call_chunk"
-              chunk.data.each do |tool_call_delta|
-                index = tool_call_delta["index"]
-                buffer = tool_calls_buffer[index] ||= { id: nil, name: "", arguments: "" }
-                
-                buffer[:id] = tool_call_delta["id"] if tool_call_delta["id"]
-                
-                if fn = tool_call_delta["function"]
-                  buffer[:name] << fn["name"] if fn["name"]
-                  buffer[:arguments] << fn["arguments"] if fn["arguments"]
-                end
-              end
+        if streamer.present?
+          # Simulate text streaming "chunk" (all at once)
+          if parsed_response.messages.present?
+            parsed_response.messages.each do |msg|
+              streamer.call(
+                Provider::LlmConcept::ChatStreamChunk.new(
+                  type: "output_text",
+                  data: msg.output_text
+                )
+              )
             end
           end
-
-          # checking if tool calls are present
-          function_requests = tool_calls_buffer.values.map do |tc|
-            # Ensure we have an ID (sometimes ID is only in the first chunk)
-            # If strictly needed and missing, might need more robust handling, but usually first chunk has it.
-            
-            Provider::LlmConcept::ChatFunctionRequest.new(
-              id: tc[:id],
-              call_id: tc[:id],
-              function_name: tc[:name],
-              function_args: JSON.parse(tc[:arguments])
-            )
-          rescue JSON::ParserError => e
-            Rails.logger.error "Failed to parse function arguments: #{tc[:arguments]} - #{e.message}"
-            nil
-          end.compact
-
-          # Return constructed ChatResponse
-          final_response = Provider::LlmConcept::ChatResponse.new(
-            id: "stream-#{SecureRandom.uuid}",
-            model: model,
-            messages: [
-              Provider::LlmConcept::ChatMessage.new(
-                id: "msg-#{SecureRandom.uuid}",
-                output_text: full_content
-              )
-            ],
-            function_requests: function_requests
-          )
-
-          # CRITICAL: Emit the final response to the streamer so the Responder knows the stream is done
-          # and can trigger tool execution or final update.
+          
+          # Emit the final response chunk (required for tools/completion)
           streamer.call(
             Provider::LlmConcept::ChatStreamChunk.new(
               type: "response",
-              data: final_response
+              data: parsed_response
             )
           )
-
-          final_response
-        else
-          ChatParser.new(raw_response).parsed
         end
+
+        parsed_response
       rescue => e
         Rails.logger.error "xAI API Error: #{e.class} - #{e.message}"
         Rails.logger.error e.backtrace.join("\n")
