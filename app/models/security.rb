@@ -1,5 +1,6 @@
 class Security < ApplicationRecord
   include Provided
+  alias_attribute :symbol, :ticker
 
   before_validation :upcase_symbols
 
