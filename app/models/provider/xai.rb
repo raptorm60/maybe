@@ -74,9 +74,10 @@ class Provider::Xai < Provider
         }
 
         # Only add tools if they exist (xAI might reject empty tools array)
-        if chat_config.tools.present?
-          params[:tools] = chat_config.tools
-        end
+        # FIXME: Temporarily disabling tools to debug 422 error
+        # if chat_config.tools.present?
+        #   params[:tools] = chat_config.tools
+        # end
 
         # Add system instructions if present
         if instructions.present?
