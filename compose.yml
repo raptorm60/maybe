@@ -22,11 +22,15 @@ x-rails-env: &rails_env
 
 services:
   web:
-    image: ghcr.io/maybe-finance/maybe:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: maybe-web
     volumes:
       - maybe-storage:/rails/storage
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     environment:
       <<: *rails_env
     depends_on:
@@ -38,7 +42,9 @@ services:
       - maybe_net
 
   worker:
-    image: ghcr.io/maybe-finance/maybe:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: maybe-worker
     command: bundle exec sidekiq
     restart: unless-stopped
