@@ -9,7 +9,7 @@ class Api::V1::MessagesController < Api::V1::BaseController
     @message = @chat.messages.build(
       content: message_params[:content],
       type: "UserMessage",
-      ai_model: message_params[:model] || "grok-4-1-fast-reasoning"
+      ai_model: message_params[:model] || "gpt-4o"
     )
 
     if @message.save

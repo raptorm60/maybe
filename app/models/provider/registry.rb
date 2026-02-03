@@ -108,7 +108,7 @@ class Provider::Registry
         when :securities
           %i[finnhub]
         when :llm
-          %i[xai]
+          %i[openai]
         else
           %i[finnhub frankfurter plaid_us plaid_eu github openai]
         end
