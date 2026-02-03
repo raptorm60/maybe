@@ -11,8 +11,8 @@ class Provider::Xai::ChatConfig
         function: {
           name: fn[:name],
           description: fn[:description],
-          parameters: fn[:params_schema]
-          # strict: fn[:strict] # Temporarily disable strict mode to ensure compatibility
+          parameters: fn[:params_schema],
+          strict: true # Strict mode is required when additionalProperties is false
         }
       }
     end
