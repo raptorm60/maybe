@@ -65,22 +65,28 @@ class Provider::Xai < Provider
         nil
       end
 
-      raw_response = client.responses.create(parameters: {
-        model: model,
-        input: chat_config.build_input(prompt),
-        instructions: instructions,
-        tools: chat_config.tools,
-        previous_response_id: previous_response_id,
-        stream: stream_proxy
-      })
+      begin
+        raw_response = client.responses.create(parameters: {
+          model: model,
+          input: chat_config.build_input(prompt),
+          instructions: instructions,
+          tools: chat_config.tools,
+          previous_response_id: previous_response_id,
+          stream: stream_proxy
+        })
 
-      # If streaming, Ruby OpenAI does not return anything, so to normalize this method's API, we search
-      # for the "response chunk" in the stream and return it (it is already parsed)
-      if stream_proxy.present?
-        response_chunk = collected_chunks.find { |chunk| chunk.type == "response" }
-        response_chunk.data
-      else
-        ChatParser.new(raw_response).parsed
+        # If streaming, Ruby OpenAI does not return anything, so to normalize this method's API, we search
+        # for the "response chunk" in the stream and return it (it is already parsed)
+        if stream_proxy.present?
+          response_chunk = collected_chunks.find { |chunk| chunk.type == "response" }
+          response_chunk.data
+        else
+          ChatParser.new(raw_response).parsed
+        end
+      rescue => e
+        Rails.logger.error "xAI API Error: #{e.class} - #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+        raise
       end
     end
   end
